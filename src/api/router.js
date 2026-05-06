@@ -21,6 +21,11 @@ async function handleApiRequest(request, env) {
     return handleLogout();
   }
 
+  // 第三方通知接口需要允许外部系统直接调用
+  // 必须在登录校验前执行，接口自身会校验 token
+  const thirdPartyResponse = await handleThirdPartyNotify(request, env, config, url);
+  if (thirdPartyResponse) return thirdPartyResponse;
+
   const { user } = await getUserFromRequest(request, env);
   if (!user && path !== '/login') {
     return new Response(
@@ -44,9 +49,6 @@ async function handleApiRequest(request, env) {
 
   const subscriptionResponse = await handleSubscriptions(request, env, path);
   if (subscriptionResponse) return subscriptionResponse;
-
-  const thirdPartyResponse = await handleThirdPartyNotify(request, env, config, url);
-  if (thirdPartyResponse) return thirdPartyResponse;
 
   return new Response(
     JSON.stringify({ success: false, message: '未找到请求的资源' }),
