@@ -24,12 +24,30 @@ const CryptoJS = {
   }
 };
 
-async function generateJWT(username, secret) {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const payload = { username, exp: Math.floor(Date.now() / 1000) + 86400 };
+function base64UrlEncode(value) {
+  return btoa(JSON.stringify(value))
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
 
-  const base64Header = btoa(JSON.stringify(header));
-  const base64Payload = btoa(JSON.stringify(payload));
+function base64UrlDecode(value) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(normalized.length + (4 - normalized.length % 4) % 4, '=');
+  return JSON.parse(atob(padded));
+}
+
+async function generateJWT(username, secret) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const payload = {
+    username,
+    iat: now,
+    exp: now + 86400
+  };
+
+  const base64Header = base64UrlEncode(header);
+  const base64Payload = base64UrlEncode(payload);
   const signatureInput = base64Header + '.' + base64Payload;
   const signature = await CryptoJS.HmacSHA256(signatureInput, secret);
 
@@ -58,7 +76,14 @@ async function verifyJWT(token, secret) {
       return null;
     }
 
-    const payload = JSON.parse(atob(payloadBase64));
+    const payload = base64UrlDecode(payloadBase64);
+    const now = Math.floor(Date.now() / 1000);
+
+    if (!Number.isFinite(payload.exp) || payload.exp <= now) {
+      console.log('[JWT] Token已过期或缺少有效exp');
+      return null;
+    }
+
     console.log('[JWT] 验证成功，用户:', payload.username);
     return payload;
   } catch (error) {
