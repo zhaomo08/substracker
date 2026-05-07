@@ -1,6 +1,6 @@
 import { getConfig } from '../data/config.js';
-import { getAllSubscriptions } from '../data/subscriptions.js';
-import { getCurrentTimeInTimezone, MS_PER_HOUR, MS_PER_DAY, getTimezoneMidnightTimestamp } from '../core/time.js';
+import { getAllSubscriptions, trimPaymentHistory } from '../data/subscriptions.js';
+import { MS_PER_HOUR, getTimezoneDateParts, getDaysDiffInTimezone } from '../core/time.js';
 import { formatNotificationContent, shouldTriggerReminder } from './notify/reminder.js';
 import { sendNotificationToAllChannels } from './notify/index.js';
 import { lunarCalendar, lunarBiz } from '../core/lunar.js';
@@ -41,9 +41,9 @@ async function dedupeNotifications(env, subscriptions, bucketKey) {
 async function checkExpiringSubscriptions(env) {
   try {
     const config = await getConfig(env);
-    const timezone = 'UTC';
-    const currentTime = getCurrentTimeInTimezone('UTC');
-    const todayMidnight = getTimezoneMidnightTimestamp(currentTime, 'UTC');
+    const timezone = config.TIMEZONE || 'UTC';
+    const currentTime = new Date();
+    const currentParts = getTimezoneDateParts(currentTime, timezone);
 
     const subscriptions = await getAllSubscriptions(env);
     const expiringSubscriptions = [];
@@ -53,7 +53,7 @@ async function checkExpiringSubscriptions(env) {
     const normalizedNotificationHours = Array.isArray(config.NOTIFICATION_HOURS)
       ? config.NOTIFICATION_HOURS.map(h => String(h).padStart(2, '0'))
       : [];
-    const currentHour = String(currentTime.getHours()).padStart(2, '0');
+    const currentHour = String(currentParts.hour).padStart(2, '0');
     const shouldNotifyThisHour =
       normalizedNotificationHours.includes('*') ||
       normalizedNotificationHours.includes('ALL') ||
@@ -82,7 +82,7 @@ async function checkExpiringSubscriptions(env) {
 
       const reminderSetting = { unit: subscription.reminderUnit || 'day', value: subscription.reminderValue ?? 7 };
       let expiryDate = new Date(subscription.expiryDate);
-      let daysDiff = Math.ceil((expiryDate.getTime() - todayMidnight) / MS_PER_DAY);
+      let daysDiff = getDaysDiffInTimezone(expiryDate, currentTime, timezone);
       let diffMs = expiryDate.getTime() - currentTime.getTime();
       let diffHours = diffMs / MS_PER_HOUR;
 
@@ -129,9 +129,7 @@ async function checkExpiringSubscriptions(env) {
         const paymentHistory = subscription.paymentHistory || [];
         paymentHistory.push(paymentRecord);
         const paymentHistoryLimit = Number(config.PAYMENT_HISTORY_LIMIT) || 100;
-        const trimmedPaymentHistory = paymentHistory.length > paymentHistoryLimit
-          ? paymentHistory.slice(-paymentHistoryLimit)
-          : paymentHistory;
+        const trimmedPaymentHistory = trimPaymentHistory(paymentHistory, paymentHistoryLimit);
 
         const updatedSubscription = {
           ...subscription,
@@ -146,7 +144,7 @@ async function checkExpiringSubscriptions(env) {
 
         diffMs = newExpiryDate.getTime() - currentTime.getTime();
         diffHours = diffMs / MS_PER_HOUR;
-        daysDiff = Math.ceil((newExpiryDate.getTime() - todayMidnight) / MS_PER_DAY);
+        daysDiff = getDaysDiffInTimezone(newExpiryDate, currentTime, timezone);
         const shouldRemindAfterRenewal = shouldTriggerReminder(reminderSetting, daysDiff, diffHours);
         if (shouldRemindAfterRenewal) {
           expiringSubscriptions.push({
@@ -193,7 +191,7 @@ async function checkExpiringSubscriptions(env) {
         console.log(`[定时任务] ${status.reason}，跳过发送`);
       } else {
         expiringSubscriptions.sort((a, b) => a.daysRemaining - b.daysRemaining);
-        const bucketKey = `${new Date().toISOString().slice(0, 13)}`;
+        const bucketKey = `${currentParts.year}-${String(currentParts.month).padStart(2, '0')}-${String(currentParts.day).padStart(2, '0')}-${currentHour}`;
         const dedupeResult = await dedupeNotifications(env, expiringSubscriptions, bucketKey);
         status.dedupeSkipped = dedupeResult.skipped;
 

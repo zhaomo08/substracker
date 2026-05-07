@@ -1,7 +1,6 @@
 import { handleApiRequest } from './api/router.js';
 import { handleAdminRequest, handleLoginPage } from './api/admin.js';
 import { handleDebug } from './api/debug.js';
-import { getCurrentTimeInTimezone } from './core/time.js';
 import { checkExpiringSubscriptions } from './services/scheduler.js';
 import { getUserFromRequest } from './api/handlers/auth.js';
 
@@ -38,7 +37,7 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    const currentTime = getCurrentTimeInTimezone('UTC');
+    const currentTime = new Date();
     console.log('[Workers] 定时任务触发', 'cron:', event?.cron || '(unknown)', 'UTC:', new Date().toISOString(), 'runtime:', currentTime.toISOString());
     await checkExpiringSubscriptions(env);
   }

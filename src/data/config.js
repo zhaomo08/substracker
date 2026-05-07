@@ -65,15 +65,33 @@ async function updateConfig(env, newConfig) {
   const config = await getConfig(env);
   const updatedConfig = {
     ...config,
-    ADMIN_USERNAME: newConfig.ADMIN_USERNAME || config.ADMIN_USERNAME,
-    ADMIN_PASSWORD: newConfig.ADMIN_PASSWORD || config.ADMIN_PASSWORD,
-    THEME_MODE: newConfig.THEME_MODE || 'system',
-    TIMEZONE: newConfig.TIMEZONE || config.TIMEZONE || 'UTC',
-    SHOW_LUNAR: newConfig.SHOW_LUNAR === true,
-    NOTIFYX_API_KEY: newConfig.NOTIFYX_API_KEY || '',
-    RESEND_API_KEY: newConfig.RESEND_API_KEY || '',
-    THIRD_PARTY_API_TOKEN: newConfig.THIRD_PARTY_API_TOKEN || '',
-    DEBUG_LOGS: newConfig.DEBUG_LOGS === true
+    ADMIN_USERNAME: Object.prototype.hasOwnProperty.call(newConfig, 'ADMIN_USERNAME')
+      ? (newConfig.ADMIN_USERNAME || config.ADMIN_USERNAME)
+      : config.ADMIN_USERNAME,
+    ADMIN_PASSWORD: Object.prototype.hasOwnProperty.call(newConfig, 'ADMIN_PASSWORD')
+      ? (newConfig.ADMIN_PASSWORD || config.ADMIN_PASSWORD)
+      : config.ADMIN_PASSWORD,
+    THEME_MODE: Object.prototype.hasOwnProperty.call(newConfig, 'THEME_MODE')
+      ? (newConfig.THEME_MODE || config.THEME_MODE || 'system')
+      : (config.THEME_MODE || 'system'),
+    TIMEZONE: Object.prototype.hasOwnProperty.call(newConfig, 'TIMEZONE')
+      ? (newConfig.TIMEZONE || config.TIMEZONE || 'UTC')
+      : (config.TIMEZONE || 'UTC'),
+    SHOW_LUNAR: Object.prototype.hasOwnProperty.call(newConfig, 'SHOW_LUNAR')
+      ? newConfig.SHOW_LUNAR === true
+      : config.SHOW_LUNAR,
+    NOTIFYX_API_KEY: Object.prototype.hasOwnProperty.call(newConfig, 'NOTIFYX_API_KEY')
+      ? (newConfig.NOTIFYX_API_KEY || '')
+      : config.NOTIFYX_API_KEY,
+    RESEND_API_KEY: Object.prototype.hasOwnProperty.call(newConfig, 'RESEND_API_KEY')
+      ? (newConfig.RESEND_API_KEY || '')
+      : config.RESEND_API_KEY,
+    THIRD_PARTY_API_TOKEN: Object.prototype.hasOwnProperty.call(newConfig, 'THIRD_PARTY_API_TOKEN')
+      ? (newConfig.THIRD_PARTY_API_TOKEN || '')
+      : config.THIRD_PARTY_API_TOKEN,
+    DEBUG_LOGS: Object.prototype.hasOwnProperty.call(newConfig, 'DEBUG_LOGS')
+      ? newConfig.DEBUG_LOGS === true
+      : config.DEBUG_LOGS
   };
 
   await env.SUBSCRIPTIONS_KV.put('config', JSON.stringify(updatedConfig));

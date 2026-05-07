@@ -1,11 +1,11 @@
 import { getAllSubscriptions } from '../../data/subscriptions.js';
 import { getDynamicRates, calculateMonthlyExpense, calculateYearlyExpense, getRecentPayments, getUpcomingRenewals, getExpenseByType, getExpenseByCategory } from '../../core/currency.js';
-import { getCurrentTimeInTimezone, MS_PER_DAY } from '../../core/time.js';
+import { MS_PER_DAY } from '../../core/time.js';
 
 async function handleDashboardStats(env, config) {
   try {
     const subscriptions = await getAllSubscriptions(env);
-    const timezone = 'UTC';
+    const timezone = config?.TIMEZONE || 'UTC';
 
     let schedulerStatus = null;
     let schedulerStatusHistory = [];
@@ -27,7 +27,7 @@ async function handleDashboardStats(env, config) {
     const expenseByCategory = getExpenseByCategory(subscriptions, timezone, rates);
 
     const activeSubscriptions = subscriptions.filter(s => s.isActive);
-    const now = getCurrentTimeInTimezone(timezone);
+    const now = new Date();
     const sevenDaysLater = new Date(now.getTime() + 7 * MS_PER_DAY);
     const expiringSoon = activeSubscriptions.filter(s => {
       const expiryDate = new Date(s.expiryDate);

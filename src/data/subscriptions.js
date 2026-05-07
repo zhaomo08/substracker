@@ -1,5 +1,3 @@
-import { getConfig } from './config.js';
-import { getCurrentTimeInTimezone, getTimezoneMidnightTimestamp } from '../core/time.js';
 import { lunarCalendar, lunarBiz } from '../core/lunar.js';
 import { resolveReminderSetting } from '../services/notify/reminder.js';
 
@@ -38,7 +36,7 @@ async function createSubscription(subscription, env) {
     }
 
     let expiryDate = new Date(subscription.expiryDate);
-    const currentTime = getCurrentTimeInTimezone('UTC');
+    const currentTime = new Date();
 
     let useLunar = !!subscription.useLunar;
     if (useLunar) {
@@ -133,7 +131,7 @@ async function updateSubscription(id, subscription, env) {
     }
 
     let expiryDate = new Date(subscription.expiryDate);
-    const currentTime = getCurrentTimeInTimezone('UTC');
+    const currentTime = new Date();
 
     let useLunar = !!subscription.useLunar;
     if (useLunar) {
@@ -257,10 +255,7 @@ async function manualRenewSubscription(id, env, options = {}) {
       return { success: false, message: '订阅未设置续订周期' };
     }
 
-    const config = await getConfig(env);
-    const currentTime = getCurrentTimeInTimezone('UTC');
-    const todayMidnight = getTimezoneMidnightTimestamp(currentTime, 'UTC');
-    void todayMidnight;
+    const currentTime = new Date();
 
     const paymentDate = options.paymentDate ? new Date(options.paymentDate) : currentTime;
     const amount = options.amount !== undefined ? options.amount : subscription.amount || 0;
@@ -470,6 +465,7 @@ async function toggleSubscriptionStatus(id, isActive, env) {
 export {
   getAllSubscriptions,
   getSubscription,
+  trimPaymentHistory,
   createSubscription,
   updateSubscription,
   deleteSubscription,

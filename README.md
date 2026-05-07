@@ -211,10 +211,12 @@ npx wrangler kv key get --binding=SUBSCRIPTIONS_KV --env="" --remote subscriptio
 - **收件人邮箱**: 接收通知的邮箱
 
 ### 🔔 通知时间与时区说明
-- 后端调度与计算统一使用 **UTC**
-- `notificationHours` 按 **UTC 小时**解释
+- Cloudflare Workers 的 Cron 表达式仍使用 **UTC** 触发（当前为每小时执行一次）
+- 系统会按后台配置的 `TIMEZONE` 计算“今天/到期日/提醒窗口/notificationHours”
+- `notificationHours` 按 **`TIMEZONE` 对应的本地小时**解释，不再固定按 UTC
 - 留空表示全天允许发送
-- 前端页面时间按“当前设备时区”显示
+- 通知内容中的时间按系统配置的 `TIMEZONE` 显示
+- 浏览器页面里的部分原生日期控件/本地展示仍可能受当前设备时区影响
 
 ### 🔐 第三方 API 安全调用
 - `POST /api/notify/{token}` 可触发系统通知

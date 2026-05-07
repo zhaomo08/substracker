@@ -2,9 +2,13 @@
 const MS_PER_HOUR = 1000 * 60 * 60;
 const MS_PER_DAY = MS_PER_HOUR * 24;
 
+function normalizeTimezone(timezone = 'UTC') {
+  return isValidTimezone(timezone) ? timezone : 'UTC';
+}
+
 function getCurrentTimeInTimezone(timezone = 'UTC') {
   try {
-    return new Date();
+    return convertUTCToTimezone(new Date(), timezone);
   } catch (error) {
     console.error(`时区转换错误: ${error.message}`);
     return new Date();
@@ -17,7 +21,10 @@ function getTimestampInTimezone(timezone = 'UTC') {
 
 function convertUTCToTimezone(utcTime, timezone = 'UTC') {
   try {
-    return new Date(utcTime);
+    const date = new Date(utcTime);
+    const safeTimezone = normalizeTimezone(timezone);
+    const { year, month, day, hour, minute, second } = getTimezoneDateParts(date, safeTimezone);
+    return new Date(Date.UTC(year, month - 1, day, hour, minute, second, date.getUTCMilliseconds()));
   } catch (error) {
     console.error(`时区转换错误: ${error.message}`);
     return new Date(utcTime);
@@ -59,24 +66,32 @@ function getTimezoneDateParts(date, timezone = 'UTC') {
 }
 
 function getTimezoneMidnightTimestamp(date, timezone = 'UTC') {
-  const { year, month, day } = getTimezoneDateParts(date, timezone);
+  const { year, month, day } = getTimezoneDateParts(date, normalizeTimezone(timezone));
   return Date.UTC(year, month - 1, day, 0, 0, 0);
+}
+
+function getDaysDiffInTimezone(targetDate, baseDate = new Date(), timezone = 'UTC') {
+  const safeTimezone = normalizeTimezone(timezone);
+  const targetMidnight = getTimezoneMidnightTimestamp(new Date(targetDate), safeTimezone);
+  const baseMidnight = getTimezoneMidnightTimestamp(new Date(baseDate), safeTimezone);
+  return Math.round((targetMidnight - baseMidnight) / MS_PER_DAY);
 }
 
 function formatTimeInTimezone(time, timezone = 'UTC', format = 'full') {
   try {
     const date = new Date(time);
+    const safeTimezone = normalizeTimezone(timezone);
 
     if (format === 'date') {
       return date.toLocaleDateString('zh-CN', {
-        timeZone: timezone,
+        timeZone: safeTimezone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'
       });
     } else if (format === 'datetime') {
       return date.toLocaleString('zh-CN', {
-        timeZone: timezone,
+        timeZone: safeTimezone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -86,7 +101,7 @@ function formatTimeInTimezone(time, timezone = 'UTC', format = 'full') {
       });
     } else {
       return date.toLocaleString('zh-CN', {
-        timeZone: timezone
+        timeZone: safeTimezone
       });
     }
   } catch (error) {
@@ -98,7 +113,7 @@ function formatTimeInTimezone(time, timezone = 'UTC', format = 'full') {
 function getTimezoneOffset(timezone = 'UTC') {
   try {
     const now = new Date();
-    const { year, month, day, hour, minute, second } = getTimezoneDateParts(now, timezone);
+    const { year, month, day, hour, minute, second } = getTimezoneDateParts(now, normalizeTimezone(timezone));
     const zonedTimestamp = Date.UTC(year, month - 1, day, hour, minute, second);
     return Math.round((zonedTimestamp - now.getTime()) / MS_PER_HOUR);
   } catch (error) {
@@ -176,11 +191,13 @@ function isValidTimezone(timezone) {
 export {
   MS_PER_HOUR,
   MS_PER_DAY,
+  normalizeTimezone,
   getCurrentTimeInTimezone,
   getTimestampInTimezone,
   convertUTCToTimezone,
   getTimezoneDateParts,
   getTimezoneMidnightTimestamp,
+  getDaysDiffInTimezone,
   formatTimeInTimezone,
   getTimezoneOffset,
   formatTimezoneDisplay,

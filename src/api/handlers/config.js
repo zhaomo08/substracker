@@ -62,6 +62,25 @@ function mergeSecretField(existingConfig, newConfig, key, clearSecretFields = []
   return trimmed;
 }
 
+function hasOwnField(source, key) {
+  return Object.prototype.hasOwnProperty.call(source || {}, key);
+}
+
+function mergePlainField(existingConfig, newConfig, key, normalize) {
+  if (!hasOwnField(newConfig, key)) return existingConfig?.[key];
+  return normalize(newConfig[key], existingConfig?.[key]);
+}
+
+function mergeStringField(existingConfig, newConfig, key, options = {}) {
+  const { trim = false, fallback = '' } = options;
+  return mergePlainField(existingConfig, newConfig, key, (value, existingValue) => {
+    const baseValue = existingValue !== undefined ? existingValue : fallback;
+    if (value === undefined || value === null) return baseValue;
+    const nextValue = typeof value === 'string' ? value : String(value);
+    return trim ? nextValue.trim() : nextValue;
+  });
+}
+
 async function handleGetConfig(env) {
   const config = await getConfig(env);
   return new Response(
@@ -78,56 +97,75 @@ async function handleUpdateConfig(request, env) {
 
     const updatedConfig = {
       ...config,
-      ADMIN_USERNAME: newConfig.ADMIN_USERNAME || config.ADMIN_USERNAME,
-      THEME_MODE: newConfig.THEME_MODE || 'system',
+      ADMIN_USERNAME: mergeStringField(config, newConfig, 'ADMIN_USERNAME', { trim: true, fallback: config.ADMIN_USERNAME || 'admin' }),
+      THEME_MODE: mergePlainField(config, newConfig, 'THEME_MODE', (value, existingValue) => {
+        const nextValue = typeof value === 'string' ? value.trim() : '';
+        return nextValue || existingValue || 'system';
+      }),
 
       TG_BOT_TOKEN: mergeSecretField(config, newConfig, 'TG_BOT_TOKEN', clearSecretFields),
-      TG_CHAT_ID: newConfig.TG_CHAT_ID || '',
+      TG_CHAT_ID: mergeStringField(config, newConfig, 'TG_CHAT_ID', { trim: true, fallback: '' }),
 
       NOTIFYX_API_KEY: mergeSecretField(config, newConfig, 'NOTIFYX_API_KEY', clearSecretFields),
 
       WEBHOOK_URL: mergeSecretField(config, newConfig, 'WEBHOOK_URL', clearSecretFields),
-      WEBHOOK_METHOD: newConfig.WEBHOOK_METHOD || 'POST',
+      WEBHOOK_METHOD: mergePlainField(config, newConfig, 'WEBHOOK_METHOD', (value, existingValue) => {
+        const nextValue = typeof value === 'string' ? value.trim() : '';
+        return nextValue || existingValue || 'POST';
+      }),
       WEBHOOK_HEADERS: mergeSecretField(config, newConfig, 'WEBHOOK_HEADERS', clearSecretFields),
-      WEBHOOK_TEMPLATE: newConfig.WEBHOOK_TEMPLATE || '',
+      WEBHOOK_TEMPLATE: mergeStringField(config, newConfig, 'WEBHOOK_TEMPLATE', { fallback: '' }),
 
-      SHOW_LUNAR: newConfig.SHOW_LUNAR === true,
+      SHOW_LUNAR: mergePlainField(config, newConfig, 'SHOW_LUNAR', value => value === true),
 
       WECHATBOT_WEBHOOK: mergeSecretField(config, newConfig, 'WECHATBOT_WEBHOOK', clearSecretFields),
-      WECHATBOT_MSG_TYPE: newConfig.WECHATBOT_MSG_TYPE || 'text',
-      WECHATBOT_AT_MOBILES: newConfig.WECHATBOT_AT_MOBILES || '',
-      WECHATBOT_AT_ALL: newConfig.WECHATBOT_AT_ALL || 'false',
+      WECHATBOT_MSG_TYPE: mergePlainField(config, newConfig, 'WECHATBOT_MSG_TYPE', (value, existingValue) => {
+        const nextValue = typeof value === 'string' ? value.trim() : '';
+        return nextValue || existingValue || 'text';
+      }),
+      WECHATBOT_AT_MOBILES: mergeStringField(config, newConfig, 'WECHATBOT_AT_MOBILES', { trim: true, fallback: '' }),
+      WECHATBOT_AT_ALL: mergeStringField(config, newConfig, 'WECHATBOT_AT_ALL', { trim: true, fallback: 'false' }),
 
       RESEND_API_KEY: mergeSecretField(config, newConfig, 'RESEND_API_KEY', clearSecretFields),
-      EMAIL_FROM: newConfig.EMAIL_FROM || '',
-      EMAIL_FROM_NAME: newConfig.EMAIL_FROM_NAME || '',
-      EMAIL_TO: newConfig.EMAIL_TO || '',
+      EMAIL_FROM: mergeStringField(config, newConfig, 'EMAIL_FROM', { trim: true, fallback: '' }),
+      EMAIL_FROM_NAME: mergeStringField(config, newConfig, 'EMAIL_FROM_NAME', { trim: true, fallback: '' }),
+      EMAIL_TO: mergeStringField(config, newConfig, 'EMAIL_TO', { trim: true, fallback: '' }),
 
       BARK_DEVICE_KEY: mergeSecretField(config, newConfig, 'BARK_DEVICE_KEY', clearSecretFields),
-      BARK_SERVER: newConfig.BARK_SERVER || 'https://api.day.app',
-      BARK_IS_ARCHIVE: newConfig.BARK_IS_ARCHIVE || 'false',
+      BARK_SERVER: mergePlainField(config, newConfig, 'BARK_SERVER', (value, existingValue) => {
+        const nextValue = typeof value === 'string' ? value.trim() : '';
+        return nextValue || existingValue || 'https://api.day.app';
+      }),
+      BARK_IS_ARCHIVE: mergeStringField(config, newConfig, 'BARK_IS_ARCHIVE', { trim: true, fallback: 'false' }),
 
-      GOTIFY_SERVER_URL: (newConfig.GOTIFY_SERVER_URL || '').trim(),
+      GOTIFY_SERVER_URL: mergeStringField(config, newConfig, 'GOTIFY_SERVER_URL', { trim: true, fallback: '' }),
       GOTIFY_APP_TOKEN: mergeSecretField(config, newConfig, 'GOTIFY_APP_TOKEN', clearSecretFields),
 
       SERVERCHAN_SENDKEY: mergeSecretField(config, newConfig, 'SERVERCHAN_SENDKEY', clearSecretFields),
 
       PUSHPLUS_TOKEN: mergeSecretField(config, newConfig, 'PUSHPLUS_TOKEN', clearSecretFields),
-      PUSHPLUS_TOPIC: (newConfig.PUSHPLUS_TOPIC || '').trim(),
-      PUSHPLUS_CHANNEL: (newConfig.PUSHPLUS_CHANNEL || '').trim(),
+      PUSHPLUS_TOPIC: mergeStringField(config, newConfig, 'PUSHPLUS_TOPIC', { trim: true, fallback: '' }),
+      PUSHPLUS_CHANNEL: mergeStringField(config, newConfig, 'PUSHPLUS_CHANNEL', { trim: true, fallback: '' }),
 
-      ENABLED_NOTIFIERS: newConfig.ENABLED_NOTIFIERS || ['notifyx'],
-      TIMEZONE: newConfig.TIMEZONE || config.TIMEZONE || 'UTC',
+      ENABLED_NOTIFIERS: mergePlainField(config, newConfig, 'ENABLED_NOTIFIERS', (value, existingValue) => {
+        return Array.isArray(value) ? value : (existingValue || ['notifyx']);
+      }),
+      TIMEZONE: mergePlainField(config, newConfig, 'TIMEZONE', (value, existingValue) => {
+        const nextValue = typeof value === 'string' ? value.trim() : '';
+        return nextValue || existingValue || 'UTC';
+      }),
 
       THIRD_PARTY_API_TOKEN: mergeSecretField(config, newConfig, 'THIRD_PARTY_API_TOKEN', clearSecretFields),
 
-      DEBUG_LOGS: newConfig.DEBUG_LOGS === true,
+      DEBUG_LOGS: mergePlainField(config, newConfig, 'DEBUG_LOGS', value => value === true),
       PAYMENT_HISTORY_LIMIT: Number.isFinite(Number(newConfig.PAYMENT_HISTORY_LIMIT))
         ? Math.min(1000, Math.max(10, Math.floor(Number(newConfig.PAYMENT_HISTORY_LIMIT))))
         : (config.PAYMENT_HISTORY_LIMIT || 100)
     };
 
-    updatedConfig.NOTIFICATION_HOURS = sanitizeNotificationHours(newConfig.NOTIFICATION_HOURS);
+    updatedConfig.NOTIFICATION_HOURS = hasOwnField(newConfig, 'NOTIFICATION_HOURS')
+      ? sanitizeNotificationHours(newConfig.NOTIFICATION_HOURS)
+      : (config.NOTIFICATION_HOURS || []);
 
     if (newConfig.ADMIN_PASSWORD) {
       updatedConfig.ADMIN_PASSWORD = newConfig.ADMIN_PASSWORD;

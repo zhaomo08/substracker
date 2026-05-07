@@ -1,4 +1,4 @@
-import { MS_PER_DAY, getCurrentTimeInTimezone, getTimezoneDateParts } from './time.js';
+import { MS_PER_DAY, getTimezoneDateParts } from './time.js';
 
 const CATEGORY_SEPARATOR_REGEX = /[\/，,\s]+/;
 
@@ -58,7 +58,7 @@ function convertToCNY(amount, currency, rates) {
 }
 
 function calculateMonthlyExpense(subscriptions, timezone, rates) {
-  const now = getCurrentTimeInTimezone(timezone);
+  const now = new Date();
   const parts = getTimezoneDateParts(now, timezone);
   const currentYear = parts.year;
   const currentMonth = parts.month;
@@ -105,7 +105,7 @@ function calculateMonthlyExpense(subscriptions, timezone, rates) {
 }
 
 function calculateYearlyExpense(subscriptions, timezone, rates) {
-  const now = getCurrentTimeInTimezone(timezone);
+  const now = new Date();
   const parts = getTimezoneDateParts(now, timezone);
   const currentYear = parts.year;
 
@@ -127,7 +127,7 @@ function calculateYearlyExpense(subscriptions, timezone, rates) {
 }
 
 function getRecentPayments(subscriptions, timezone) {
-  const now = getCurrentTimeInTimezone(timezone);
+  const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * MS_PER_DAY);
   const recentPayments = [];
   subscriptions.forEach(sub => {
@@ -151,7 +151,7 @@ function getRecentPayments(subscriptions, timezone) {
 }
 
 function getUpcomingRenewals(subscriptions, timezone) {
-  const now = getCurrentTimeInTimezone(timezone);
+  const now = new Date();
   const sevenDaysLater = new Date(now.getTime() + 7 * MS_PER_DAY);
   return subscriptions
     .filter(sub => {
@@ -175,7 +175,7 @@ function getUpcomingRenewals(subscriptions, timezone) {
 }
 
 function getExpenseByType(subscriptions, timezone, rates) {
-  const now = getCurrentTimeInTimezone(timezone);
+  const now = new Date();
   const parts = getTimezoneDateParts(now, timezone);
   const currentYear = parts.year;
   const typeMap = {};
@@ -205,7 +205,7 @@ function getExpenseByType(subscriptions, timezone, rates) {
 }
 
 function getExpenseByCategory(subscriptions, timezone, rates) {
-  const now = getCurrentTimeInTimezone(timezone);
+  const now = new Date();
   const parts = getTimezoneDateParts(now, timezone);
   const currentYear = parts.year;
 
