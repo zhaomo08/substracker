@@ -9,7 +9,11 @@ name = "subscription-manager"
 [env.staging]
 name = "subscription-manager-staging"
 
-# KV 命名空间配置（默认模板不预设固定 ID，运行 npm run setup 自动生成）
+# KV 命名空间配置（自动生成）
+[[kv_namespaces]]
+binding = "SUBSCRIPTIONS_KV"
+id = "1c46b031e08e4213942848741ab02b93"
+preview_id = "a73b3d6e1da24685bb7092dd8c0af7bb"
 
 # 定时任务配置 - 每小时检查一次（UTC）
 [triggers]
