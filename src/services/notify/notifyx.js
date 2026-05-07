@@ -1,3 +1,5 @@
+import { readSafeResponse } from './logging.js';
+
 async function sendNotifyXNotification(title, content, description, config) {
   try {
     if (!config.NOTIFYX_API_KEY) {
@@ -18,8 +20,8 @@ async function sendNotifyXNotification(title, content, description, config) {
       })
     });
 
-    const result = await response.json();
-    console.log('[NotifyX] 发送结果:', result);
+    const result = await readSafeResponse(response);
+    console.log('[NotifyX] 发送结果:', response.status);
     return result.status === 'queued';
   } catch (error) {
     console.error('[NotifyX] 发送通知失败:', error);

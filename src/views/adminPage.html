@@ -2309,7 +2309,7 @@ const lunarBiz = {
     // 自定义日期选择器功能
     class CustomDatePicker {
       constructor(inputId, pickerId, calendarId, monthId, yearId, prevBtnId, nextBtnId) {
-        console.log('CustomDatePicker 构造函数:', { inputId, pickerId, calendarId, monthId, yearId, prevBtnId, nextBtnId });
+        debugLog('CustomDatePicker 构造函数:', { inputId, pickerId, calendarId, monthId, yearId, prevBtnId, nextBtnId });
         
         this.input = document.getElementById(inputId);
         this.picker = document.getElementById(pickerId);
@@ -2330,7 +2330,7 @@ const lunarBiz = {
         this.yearRangeElement = document.getElementById(pickerId.replace('Picker', 'YearRange'));
         this.yearGrid = document.getElementById(pickerId.replace('Picker', 'YearGrid'));
         
-        console.log('找到的元素:', {
+        debugLog('找到的元素:', {
           input: !!this.input,
           picker: !!this.picker,
           calendar: !!this.calendar,
@@ -2349,7 +2349,7 @@ const lunarBiz = {
       }
       
       init() {
-        console.log('初始化日期选择器，输入框:', !!this.input, '选择器:', !!this.picker);
+        debugLog('初始化日期选择器，输入框:', !!this.input, '选择器:', !!this.picker);
         
         // 绑定基本事件
         if (this.input) {
@@ -2456,7 +2456,7 @@ const lunarBiz = {
         }
         this._outsideClickHandler = (e) => {
           if (this.picker && !this.picker.contains(e.target) && !this.input.contains(e.target)) {
-            console.log('点击外部，隐藏日期选择器');
+            debugLog('点击外部，隐藏日期选择器');
             this.hide();
           }
         };
@@ -2469,23 +2469,23 @@ const lunarBiz = {
       }
       
       toggle() {
-        console.log('toggle 被调用');
-        console.log('picker 元素:', this.picker);
-        console.log('picker 类名:', this.picker ? this.picker.className : 'null');
-        console.log('是否包含 hidden:', this.picker ? this.picker.classList.contains('hidden') : 'null');
+        debugLog('toggle 被调用');
+        debugLog('picker 元素:', this.picker);
+        debugLog('picker 类名:', this.picker ? this.picker.className : 'null');
+        debugLog('是否包含 hidden:', this.picker ? this.picker.classList.contains('hidden') : 'null');
         
         if (this.picker && this.picker.classList.contains('hidden')) {
-          console.log('显示日期选择器');
+          debugLog('显示日期选择器');
           this.show();
         } else {
-          console.log('隐藏日期选择器');
+          debugLog('隐藏日期选择器');
           this.hide();
         }
       }
       
       // 强制显示日期选择器
       forceShow() {
-        console.log('forceShow 被调用');
+        debugLog('forceShow 被调用');
         if (this.picker) {
           // 确保选择器显示
           this.picker.classList.remove('hidden');
@@ -2493,7 +2493,7 @@ const lunarBiz = {
           this.currentView = 'calendar';
           this.hideAllViews();
           this.render();
-          console.log('日期选择器已显示');
+          debugLog('日期选择器已显示');
         } else {
           console.error('日期选择器元素不存在');
         }

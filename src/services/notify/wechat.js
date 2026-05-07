@@ -1,3 +1,5 @@
+import { maskValue } from './logging.js';
+
 async function sendWechatBotNotification(title, content, config) {
   try {
     if (!config.WECHATBOT_WEBHOOK) {
@@ -5,7 +7,7 @@ async function sendWechatBotNotification(title, content, config) {
       return false;
     }
 
-    console.log('[企业微信机器人] 开始发送通知到: ' + config.WECHATBOT_WEBHOOK);
+    console.log('[企业微信机器人] 开始发送通知到:', maskValue(config.WECHATBOT_WEBHOOK));
 
     let messageData;
     const msgType = config.WECHATBOT_MSG_TYPE || 'text';
@@ -37,8 +39,6 @@ async function sendWechatBotNotification(title, content, config) {
       }
     }
 
-    console.log('[企业微信机器人] 发送消息数据:', JSON.stringify(messageData, null, 2));
-
     const response = await fetch(config.WECHATBOT_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -47,7 +47,6 @@ async function sendWechatBotNotification(title, content, config) {
 
     const responseText = await response.text();
     console.log('[企业微信机器人] 响应状态:', response.status);
-    console.log('[企业微信机器人] 响应内容:', responseText);
 
     if (response.ok) {
       try {

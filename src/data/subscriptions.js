@@ -1,4 +1,6 @@
+import { getConfig } from './config.js';
 import { lunarCalendar, lunarBiz } from '../core/lunar.js';
+import { validateRenewOptions, validateSubscriptionInput } from '../core/validation.js';
 import { resolveReminderSetting } from '../services/notify/reminder.js';
 
 function trimPaymentHistory(records = [], limit = 100) {
@@ -11,6 +13,84 @@ function trimPaymentHistory(records = [], limit = 100) {
   const keptOther = otherRecords.slice(-(safeLimit - Math.min(initialRecords.length, 1)));
   const keptInitial = initialRecords.length > 0 ? [initialRecords[0]] : [];
   return [...keptInitial, ...keptOther];
+}
+
+function generateId() {
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function addSolarPeriod(date, periodValue, periodUnit, multiplier = 1) {
+  const nextDate = new Date(date);
+  const totalPeriodValue = periodValue * multiplier;
+
+  if (periodUnit === 'day') {
+    nextDate.setDate(nextDate.getDate() + totalPeriodValue);
+  } else if (periodUnit === 'month') {
+    nextDate.setMonth(nextDate.getMonth() + totalPeriodValue);
+  } else if (periodUnit === 'year') {
+    nextDate.setFullYear(nextDate.getFullYear() + totalPeriodValue);
+  }
+
+  return nextDate;
+}
+
+function addLunarPeriodFromDate(date, periodValue, periodUnit, multiplier = 1) {
+  const lunar = lunarCalendar.solar2lunar(date.getFullYear(), date.getMonth() + 1, date.getDate());
+  if (!lunar) {
+    throw new Error('农历日期超出支持范围（1900-2100年）');
+  }
+
+  let nextLunar = lunar;
+  for (let i = 0; i < multiplier; i++) {
+    nextLunar = lunarBiz.addLunarPeriod(nextLunar, periodValue, periodUnit);
+  }
+
+  const solar = lunarBiz.lunar2solar(nextLunar);
+  return new Date(solar.year, solar.month - 1, solar.day);
+}
+
+function addSubscriptionPeriod(date, periodValue, periodUnit, useLunar = false, multiplier = 1) {
+  return useLunar
+    ? addLunarPeriodFromDate(date, periodValue, periodUnit, multiplier)
+    : addSolarPeriod(date, periodValue, periodUnit, multiplier);
+}
+
+function advanceExpiryAfter(expiryDate, subscription, currentTime, options = {}) {
+  let nextExpiryDate = new Date(expiryDate);
+  let periodsAdded = 0;
+  const inclusive = options.inclusive === true;
+  const mode = subscription.subscriptionMode || 'cycle';
+
+  const isExpired = () => inclusive ? nextExpiryDate <= currentTime : nextExpiryDate < currentTime;
+  while (isExpired()) {
+    const baseDate = mode === 'reset' ? currentTime : nextExpiryDate;
+    nextExpiryDate = addSubscriptionPeriod(
+      baseDate,
+      subscription.periodValue,
+      subscription.periodUnit,
+      !!subscription.useLunar
+    );
+    periodsAdded += 1;
+  }
+
+  return { expiryDate: nextExpiryDate, periodsAdded };
+}
+
+function calculateRenewalWindow(subscription, paymentDate, periodMultiplier = 1) {
+  const mode = subscription.subscriptionMode || 'cycle';
+  const currentExpiryDate = new Date(subscription.expiryDate);
+  const newStartDate = mode === 'reset' || currentExpiryDate.getTime() <= paymentDate.getTime()
+    ? new Date(paymentDate)
+    : new Date(currentExpiryDate);
+  const newExpiryDate = addSubscriptionPeriod(
+    newStartDate,
+    subscription.periodValue,
+    subscription.periodUnit,
+    !!subscription.useLunar,
+    periodMultiplier
+  );
+
+  return { newStartDate, newExpiryDate };
 }
 
 async function getAllSubscriptions(env) {
@@ -30,50 +110,30 @@ async function getSubscription(id, env) {
 async function createSubscription(subscription, env) {
   try {
     const subscriptions = await getAllSubscriptions(env);
-
-    if (!subscription.name || !subscription.expiryDate) {
-      return { success: false, message: '缺少必填字段' };
+    const validation = validateSubscriptionInput(subscription);
+    if (!validation.success) {
+      return { success: false, message: validation.message };
     }
+    subscription = validation.subscription;
 
     let expiryDate = new Date(subscription.expiryDate);
     const currentTime = new Date();
 
     let useLunar = !!subscription.useLunar;
     if (useLunar) {
-      let lunar = lunarCalendar.solar2lunar(
-        expiryDate.getFullYear(),
-        expiryDate.getMonth() + 1,
-        expiryDate.getDate()
-      );
-
-      if (lunar && subscription.periodValue && subscription.periodUnit) {
-        while (expiryDate <= currentTime) {
-          lunar = lunarBiz.addLunarPeriod(lunar, subscription.periodValue, subscription.periodUnit);
-          const solar = lunarBiz.lunar2solar(lunar);
-          expiryDate = new Date(solar.year, solar.month - 1, solar.day);
-        }
-        subscription.expiryDate = expiryDate.toISOString();
-      }
-    } else {
-      if (expiryDate < currentTime && subscription.periodValue && subscription.periodUnit) {
-        while (expiryDate < currentTime) {
-          if (subscription.periodUnit === 'day') {
-            expiryDate.setDate(expiryDate.getDate() + subscription.periodValue);
-          } else if (subscription.periodUnit === 'month') {
-            expiryDate.setMonth(expiryDate.getMonth() + subscription.periodValue);
-          } else if (subscription.periodUnit === 'year') {
-            expiryDate.setFullYear(expiryDate.getFullYear() + subscription.periodValue);
-          }
-        }
-        subscription.expiryDate = expiryDate.toISOString();
-      }
+      addLunarPeriodFromDate(expiryDate, 0, subscription.periodUnit, 0);
+    }
+    if (subscription.periodValue && subscription.periodUnit) {
+      const advanced = advanceExpiryAfter(expiryDate, subscription, currentTime, { inclusive: useLunar });
+      expiryDate = advanced.expiryDate;
+      subscription.expiryDate = expiryDate.toISOString();
     }
 
     const reminderSetting = resolveReminderSetting(subscription);
 
     const initialPaymentDate = subscription.startDate || currentTime.toISOString();
     const newSubscription = {
-      id: Date.now().toString(),
+      id: generateId(),
       name: subscription.name,
       subscriptionMode: subscription.subscriptionMode || 'cycle',
       customType: subscription.customType || '',
@@ -91,7 +151,7 @@ async function createSubscription(subscription, env) {
       currency: subscription.currency || 'CNY',
       lastPaymentDate: initialPaymentDate,
       paymentHistory: subscription.amount !== undefined && subscription.amount !== null ? [{
-        id: Date.now().toString(),
+        id: generateId(),
         date: initialPaymentDate,
         amount: subscription.amount,
         currency: subscription.currency || 'CNY',
@@ -126,44 +186,23 @@ async function updateSubscription(id, subscription, env) {
       return { success: false, message: '订阅不存在' };
     }
 
-    if (!subscription.name || !subscription.expiryDate) {
-      return { success: false, message: '缺少必填字段' };
+    const validation = validateSubscriptionInput(subscription);
+    if (!validation.success) {
+      return { success: false, message: validation.message };
     }
+    subscription = validation.subscription;
 
     let expiryDate = new Date(subscription.expiryDate);
     const currentTime = new Date();
 
     let useLunar = !!subscription.useLunar;
     if (useLunar) {
-      let lunar = lunarCalendar.solar2lunar(
-        expiryDate.getFullYear(),
-        expiryDate.getMonth() + 1,
-        expiryDate.getDate()
-      );
-      if (!lunar) {
-        return { success: false, message: '农历日期超出支持范围（1900-2100年）' };
-      }
-      if (lunar && expiryDate < currentTime && subscription.periodValue && subscription.periodUnit) {
-        do {
-          lunar = lunarBiz.addLunarPeriod(lunar, subscription.periodValue, subscription.periodUnit);
-          const solar = lunarBiz.lunar2solar(lunar);
-          expiryDate = new Date(solar.year, solar.month - 1, solar.day);
-        } while (expiryDate < currentTime);
-        subscription.expiryDate = expiryDate.toISOString();
-      }
-    } else {
-      if (expiryDate < currentTime && subscription.periodValue && subscription.periodUnit) {
-        while (expiryDate < currentTime) {
-          if (subscription.periodUnit === 'day') {
-            expiryDate.setDate(expiryDate.getDate() + subscription.periodValue);
-          } else if (subscription.periodUnit === 'month') {
-            expiryDate.setMonth(expiryDate.getMonth() + subscription.periodValue);
-          } else if (subscription.periodUnit === 'year') {
-            expiryDate.setFullYear(expiryDate.getFullYear() + subscription.periodValue);
-          }
-        }
-        subscription.expiryDate = expiryDate.toISOString();
-      }
+      addLunarPeriodFromDate(expiryDate, 0, subscription.periodUnit, 0);
+    }
+    if (expiryDate < currentTime && subscription.periodValue && subscription.periodUnit) {
+      const advanced = advanceExpiryAfter(expiryDate, subscription, currentTime);
+      expiryDate = advanced.expiryDate;
+      subscription.expiryDate = expiryDate.toISOString();
     }
 
     const reminderSource = {
@@ -242,6 +281,12 @@ async function deleteSubscription(id, env) {
 
 async function manualRenewSubscription(id, env, options = {}) {
   try {
+    const renewValidation = validateRenewOptions(options);
+    if (!renewValidation.success) {
+      return { success: false, message: renewValidation.message };
+    }
+    options = renewValidation.options;
+
     const subscriptions = await getAllSubscriptions(env);
     const index = subscriptions.findIndex(s => s.id === id);
 
@@ -261,51 +306,10 @@ async function manualRenewSubscription(id, env, options = {}) {
     const amount = options.amount !== undefined ? options.amount : subscription.amount || 0;
     const periodMultiplier = options.periodMultiplier || 1;
     const note = options.note || '手动续订';
-    const mode = subscription.subscriptionMode || 'cycle';
-
-    let newStartDate;
-    let currentExpiryDate = new Date(subscription.expiryDate);
-
-    if (mode === 'reset') {
-      newStartDate = new Date(paymentDate);
-    } else {
-      if (currentExpiryDate.getTime() > paymentDate.getTime()) {
-        newStartDate = new Date(currentExpiryDate);
-      } else {
-        newStartDate = new Date(paymentDate);
-      }
-    }
-
-    let newExpiryDate;
-    if (subscription.useLunar) {
-      const solarStart = {
-        year: newStartDate.getFullYear(),
-        month: newStartDate.getMonth() + 1,
-        day: newStartDate.getDate()
-      };
-      let lunar = lunarCalendar.solar2lunar(solarStart.year, solarStart.month, solarStart.day);
-
-      let nextLunar = lunar;
-      for (let i = 0; i < periodMultiplier; i++) {
-        nextLunar = lunarBiz.addLunarPeriod(nextLunar, subscription.periodValue, subscription.periodUnit);
-      }
-      const solar = lunarBiz.lunar2solar(nextLunar);
-      newExpiryDate = new Date(solar.year, solar.month - 1, solar.day);
-    } else {
-      newExpiryDate = new Date(newStartDate);
-      const totalPeriodValue = subscription.periodValue * periodMultiplier;
-
-      if (subscription.periodUnit === 'day') {
-        newExpiryDate.setDate(newExpiryDate.getDate() + totalPeriodValue);
-      } else if (subscription.periodUnit === 'month') {
-        newExpiryDate.setMonth(newExpiryDate.getMonth() + totalPeriodValue);
-      } else if (subscription.periodUnit === 'year') {
-        newExpiryDate.setFullYear(newExpiryDate.getFullYear() + totalPeriodValue);
-      }
-    }
+    const { newStartDate, newExpiryDate } = calculateRenewalWindow(subscription, paymentDate, periodMultiplier);
 
     const paymentRecord = {
-      id: Date.now().toString(),
+      id: generateId(),
       date: paymentDate.toISOString(),
       amount: amount,
       currency: subscription.currency || 'CNY',
@@ -465,6 +469,9 @@ async function toggleSubscriptionStatus(id, isActive, env) {
 export {
   getAllSubscriptions,
   getSubscription,
+  addSubscriptionPeriod,
+  advanceExpiryAfter,
+  calculateRenewalWindow,
   trimPaymentHistory,
   createSubscription,
   updateSubscription,

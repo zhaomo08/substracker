@@ -1,4 +1,6 @@
 import { getConfig, setConfig } from '../../data/config.js';
+import { hashPassword } from '../../core/auth.js';
+import { validateConfigPatch } from '../../core/validation.js';
 import { generateRandomSecret, sanitizeNotificationHours } from '../utils.js';
 
 // 这些字段可能包含 token/密钥，绝不下发到浏览器
@@ -21,7 +23,7 @@ function isConfiguredSecret(value) {
 }
 
 function buildSafeConfig(config) {
-  const { JWT_SECRET, ADMIN_PASSWORD, ...safeConfig } = config;
+  const { JWT_SECRET, ADMIN_PASSWORD, ADMIN_PASSWORD_HASH, ...safeConfig } = config;
   const response = { ...safeConfig };
 
   // 对每个敏感字段：返回空字符串 + 一个 *_CONFIGURED 标记
@@ -93,6 +95,14 @@ async function handleUpdateConfig(request, env) {
   try {
     const config = await getConfig(env);
     const newConfig = await request.json();
+    const validation = validateConfigPatch(newConfig);
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ success: false, message: validation.message }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     const clearSecretFields = normalizeClearSecretFields(newConfig?.CLEAR_SECRET_FIELDS);
 
     const updatedConfig = {
@@ -168,7 +178,8 @@ async function handleUpdateConfig(request, env) {
       : (config.NOTIFICATION_HOURS || []);
 
     if (newConfig.ADMIN_PASSWORD) {
-      updatedConfig.ADMIN_PASSWORD = newConfig.ADMIN_PASSWORD;
+      updatedConfig.ADMIN_PASSWORD = '';
+      updatedConfig.ADMIN_PASSWORD_HASH = await hashPassword(newConfig.ADMIN_PASSWORD);
     }
 
     if (!updatedConfig.JWT_SECRET || updatedConfig.JWT_SECRET === 'your-secret-key') {

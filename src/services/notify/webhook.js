@@ -1,4 +1,5 @@
 import { formatTimeInTimezone } from '../../core/time.js';
+import { maskValue, readSafeResponse } from './logging.js';
 
 async function sendWebhookNotification(title, content, config, metadata = {}) {
   try {
@@ -7,7 +8,7 @@ async function sendWebhookNotification(title, content, config, metadata = {}) {
       return false;
     }
 
-    console.log('[Webhook通知] 开始发送通知到: ' + config.WEBHOOK_URL);
+    console.log('[Webhook通知] 开始发送通知到:', maskValue(config.WEBHOOK_URL));
 
     let requestBody;
     let headers = { 'Content-Type': 'application/json' };
@@ -92,8 +93,8 @@ async function sendWebhookNotification(title, content, config, metadata = {}) {
       body: JSON.stringify(requestBody)
     });
 
-    const result = await response.text();
-    console.log('[Webhook通知] 发送结果:', response.status, result);
+    await readSafeResponse(response);
+    console.log('[Webhook通知] 发送结果:', response.status);
     return response.ok;
   } catch (error) {
     console.error('[Webhook通知] 发送通知失败:', error);

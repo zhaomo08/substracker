@@ -1,9 +1,8 @@
 import { getConfig } from '../data/config.js';
-import { getAllSubscriptions, trimPaymentHistory } from '../data/subscriptions.js';
+import { advanceExpiryAfter, getAllSubscriptions, trimPaymentHistory } from '../data/subscriptions.js';
 import { MS_PER_HOUR, getTimezoneDateParts, getDaysDiffInTimezone } from '../core/time.js';
 import { formatNotificationContent, shouldTriggerReminder } from './notify/reminder.js';
 import { sendNotificationToAllChannels } from './notify/index.js';
-import { lunarCalendar, lunarBiz } from '../core/lunar.js';
 
 async function saveSchedulerStatus(env, status) {
   try {
@@ -36,6 +35,10 @@ async function dedupeNotifications(env, subscriptions, bucketKey) {
   }
 
   return { deduped, skipped };
+}
+
+function generateId() {
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 async function checkExpiringSubscriptions(env) {
@@ -88,36 +91,14 @@ async function checkExpiringSubscriptions(env) {
 
       if (subscription.autoRenew && daysDiff < 0) {
         const mode = subscription.subscriptionMode || 'cycle';
-        let periodsAdded = 0;
-
-        if (subscription.useLunar) {
-          let lunar = lunarCalendar.solar2lunar(expiryDate.getFullYear(), expiryDate.getMonth() + 1, expiryDate.getDate());
-          while (expiryDate <= currentTime) {
-            lunar = lunarBiz.addLunarPeriod(lunar, subscription.periodValue, subscription.periodUnit);
-            const solar = lunarBiz.lunar2solar(lunar);
-            expiryDate = new Date(solar.year, solar.month - 1, solar.day);
-            periodsAdded++;
-          }
-        } else {
-          while (expiryDate <= currentTime) {
-            if (mode === 'reset') {
-              expiryDate = new Date(currentTime);
-            }
-            if (subscription.periodUnit === 'day') {
-              expiryDate.setDate(expiryDate.getDate() + subscription.periodValue);
-            } else if (subscription.periodUnit === 'month') {
-              expiryDate.setMonth(expiryDate.getMonth() + subscription.periodValue);
-            } else if (subscription.periodUnit === 'year') {
-              expiryDate.setFullYear(expiryDate.getFullYear() + subscription.periodValue);
-            }
-            periodsAdded++;
-          }
-        }
+        const advanced = advanceExpiryAfter(expiryDate, subscription, currentTime, { inclusive: true });
+        const periodsAdded = advanced.periodsAdded;
+        expiryDate = advanced.expiryDate;
 
         const newStartDate = mode === 'reset' ? new Date(currentTime) : new Date(subscription.expiryDate);
         const newExpiryDate = expiryDate;
         const paymentRecord = {
-          id: Date.now().toString(),
+          id: generateId(),
           date: currentTime.toISOString(),
           amount: subscription.amount || 0,
           type: 'auto',

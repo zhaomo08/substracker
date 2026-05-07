@@ -24,6 +24,79 @@ const CryptoJS = {
   }
 };
 
+const PASSWORD_HASH_ITERATIONS = 120000;
+
+function bytesToHex(bytes) {
+  return Array.from(bytes).map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function hexToBytes(hex) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+}
+
+function randomHex(byteLength = 16) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return bytesToHex(bytes);
+}
+
+function constantTimeEqual(a = '', b = '') {
+  const left = new TextEncoder().encode(String(a));
+  const right = new TextEncoder().encode(String(b));
+  const length = Math.max(left.length, right.length);
+  let diff = left.length ^ right.length;
+
+  for (let i = 0; i < length; i++) {
+    diff |= (left[i] || 0) ^ (right[i] || 0);
+  }
+
+  return diff === 0;
+}
+
+async function pbkdf2Hex(password, saltHex, iterations = PASSWORD_HASH_ITERATIONS) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(String(password)),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: hexToBytes(saltHex),
+      iterations
+    },
+    key,
+    256
+  );
+  return bytesToHex(new Uint8Array(bits));
+}
+
+async function hashPassword(password) {
+  const salt = randomHex(16);
+  const hash = await pbkdf2Hex(password, salt);
+  return `pbkdf2-sha256$${PASSWORD_HASH_ITERATIONS}$${salt}$${hash}`;
+}
+
+async function verifyPassword(password, encodedHash) {
+  if (!encodedHash || typeof encodedHash !== 'string') return false;
+  const [algorithm, iterationsRaw, salt, expectedHash] = encodedHash.split('$');
+  const iterations = Number(iterationsRaw);
+
+  if (algorithm !== 'pbkdf2-sha256' || !Number.isInteger(iterations) || !salt || !expectedHash) {
+    return false;
+  }
+
+  const actualHash = await pbkdf2Hex(password, salt, iterations);
+  return constantTimeEqual(actualHash, expectedHash);
+}
+
 function base64UrlEncode(value) {
   return btoa(JSON.stringify(value))
     .replace(/=/g, '')
@@ -71,7 +144,7 @@ async function verifyJWT(token, secret) {
     const signatureInput = headerBase64 + '.' + payloadBase64;
     const expectedSignature = await CryptoJS.HmacSHA256(signatureInput, secret);
 
-    if (signature !== expectedSignature) {
+    if (!constantTimeEqual(signature, expectedSignature)) {
       console.log('[JWT] 签名验证失败');
       return null;
     }
@@ -92,4 +165,4 @@ async function verifyJWT(token, secret) {
   }
 }
 
-export { generateJWT, verifyJWT };
+export { constantTimeEqual, generateJWT, hashPassword, verifyJWT, verifyPassword };

@@ -1,3 +1,5 @@
+import { maskValue, readSafeResponse } from './logging.js';
+
 async function sendBarkNotification(title, content, config) {
   try {
     if (!config.BARK_DEVICE_KEY) {
@@ -5,7 +7,7 @@ async function sendBarkNotification(title, content, config) {
       return false;
     }
 
-    console.log('[Bark] 开始发送通知到设备: ' + config.BARK_DEVICE_KEY);
+    console.log('[Bark] 开始发送通知，设备:', maskValue(config.BARK_DEVICE_KEY));
 
     const serverUrl = config.BARK_SERVER || 'https://api.day.app';
     const url = serverUrl + '/push';
@@ -27,8 +29,8 @@ async function sendBarkNotification(title, content, config) {
       body: JSON.stringify(payload)
     });
 
-    const result = await response.json();
-    console.log('[Bark] 发送结果:', result);
+    const result = await readSafeResponse(response);
+    console.log('[Bark] 发送结果:', response.status);
 
     return result.code === 200;
   } catch (error) {

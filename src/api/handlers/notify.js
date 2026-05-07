@@ -1,3 +1,4 @@
+import { constantTimeEqual } from '../../core/auth.js';
 import { getConfig } from '../../data/config.js';
 import { sendNotificationToAllChannels } from '../../services/notify/index.js';
 
@@ -19,7 +20,7 @@ async function handleThirdPartyNotify(request, env, config, url) {
     );
   }
 
-  if (!providedToken || providedToken !== expectedToken) {
+  if (!providedToken || !constantTimeEqual(providedToken, expectedToken)) {
     return new Response(
       JSON.stringify({ message: '访问未授权，令牌无效或缺失' }),
       { status: 401, headers: { 'Content-Type': 'application/json' } }

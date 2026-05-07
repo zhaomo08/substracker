@@ -1,4 +1,5 @@
 import { formatTimeInTimezone } from '../../core/time.js';
+import { maskValue, readSafeResponse } from './logging.js';
 
 async function sendEmailNotification(title, content, config) {
   try {
@@ -7,7 +8,7 @@ async function sendEmailNotification(title, content, config) {
       return false;
     }
 
-    console.log('[邮件通知] 开始发送邮件到: ' + config.EMAIL_TO);
+    console.log('[邮件通知] 开始发送邮件到:', maskValue(config.EMAIL_TO));
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -66,14 +67,14 @@ async function sendEmailNotification(title, content, config) {
       })
     });
 
-    const result = await response.json();
-    console.log('[邮件通知] 发送结果:', response.status, result);
+    const result = await readSafeResponse(response);
+    console.log('[邮件通知] 发送结果:', response.status);
 
     if (response.ok && result.id) {
       console.log('[邮件通知] 邮件发送成功，ID:', result.id);
       return true;
     } else {
-      console.error('[邮件通知] 邮件发送失败:', result);
+      console.error('[邮件通知] 邮件发送失败，状态码:', response.status);
       return false;
     }
   } catch (error) {

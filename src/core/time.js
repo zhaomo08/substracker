@@ -36,6 +36,7 @@ function getTimezoneDateParts(date, timezone = 'UTC') {
     const formatter = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
       hour12: false,
+      hourCycle: 'h23',
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', second: '2-digit'
     });
@@ -48,7 +49,7 @@ function getTimezoneDateParts(date, timezone = 'UTC') {
       year: pick('year'),
       month: pick('month'),
       day: pick('day'),
-      hour: pick('hour'),
+      hour: pick('hour') === 24 ? 0 : pick('hour'),
       minute: pick('minute'),
       second: pick('second')
     };

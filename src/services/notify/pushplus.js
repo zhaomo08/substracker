@@ -1,3 +1,5 @@
+import { readSafeResponse } from './logging.js';
+
 async function sendPushPlusNotification(title, content, config) {
   try {
     if (!config.PUSHPLUS_TOKEN) {
@@ -28,8 +30,8 @@ async function sendPushPlusNotification(title, content, config) {
       body: JSON.stringify(payload)
     });
 
-    const result = await response.json();
-    console.log('[PushPlus] 发送结果:', result);
+    const result = await readSafeResponse(response);
+    console.log('[PushPlus] 发送结果:', response.status);
     return result.code === 200;
   } catch (error) {
     console.error('[PushPlus] 发送通知失败:', error);

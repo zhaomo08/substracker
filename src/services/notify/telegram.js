@@ -1,3 +1,5 @@
+import { maskValue, readSafeResponse } from './logging.js';
+
 function escapeMarkdownV2(text = '') {
   return String(text).replace(/([_\*\[\]\(\)~`>#+\-=|{}.!\\])/g, '\\$1');
 }
@@ -9,7 +11,7 @@ async function sendTelegramNotification(message, config) {
       return false;
     }
 
-    console.log('[Telegram] 开始发送通知到 Chat ID: ' + config.TG_CHAT_ID);
+    console.log('[Telegram] 开始发送通知到 Chat ID:', maskValue(config.TG_CHAT_ID));
 
     const url = 'https://api.telegram.org/bot' + config.TG_BOT_TOKEN + '/sendMessage';
     const escapedMessage = escapeMarkdownV2(message);
@@ -24,7 +26,7 @@ async function sendTelegramNotification(message, config) {
       })
     });
 
-    const result = await response.json();
+    const result = await readSafeResponse(response);
 
     // 兜底：如果 MarkdownV2 仍失败，降级纯文本再发一次
     if (!result.ok && result.description && result.description.includes('parse entities')) {
@@ -36,12 +38,12 @@ async function sendTelegramNotification(message, config) {
           text: String(message)
         })
       });
-      const fallbackResult = await fallbackResponse.json();
-      console.log('[Telegram] 发送结果(纯文本兜底):', fallbackResult);
+      const fallbackResult = await readSafeResponse(fallbackResponse);
+      console.log('[Telegram] 发送结果(纯文本兜底):', fallbackResponse.status);
       return fallbackResult.ok;
     }
 
-    console.log('[Telegram] 发送结果:', result);
+    console.log('[Telegram] 发送结果:', response.status);
     return result.ok;
   } catch (error) {
     console.error('[Telegram] 发送通知失败:', error);

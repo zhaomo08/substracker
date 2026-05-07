@@ -1,3 +1,5 @@
+import { readSafeResponse } from './logging.js';
+
 async function sendGotifyNotification(title, content, config) {
   try {
     const serverUrl = (config.GOTIFY_SERVER_URL || '').trim();
@@ -25,8 +27,8 @@ async function sendGotifyNotification(title, content, config) {
     });
 
     if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      console.error('[Gotify] 请求失败:', response.status, text);
+      await readSafeResponse(response);
+      console.error('[Gotify] 请求失败，状态码:', response.status);
       return false;
     }
 

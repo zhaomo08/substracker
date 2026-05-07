@@ -1,3 +1,5 @@
+import { readSafeResponse } from './logging.js';
+
 async function sendServerChanNotification(title, content, config) {
   try {
     if (!config.SERVERCHAN_SENDKEY) {
@@ -19,8 +21,8 @@ async function sendServerChanNotification(title, content, config) {
       body: body.toString()
     });
 
-    const result = await response.json();
-    console.log('[Server酱] 发送结果:', result);
+    const result = await readSafeResponse(response);
+    console.log('[Server酱] 发送结果:', response.status);
     return result.code === 0;
   } catch (error) {
     console.error('[Server酱] 发送通知失败:', error);
