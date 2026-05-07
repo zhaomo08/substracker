@@ -1,3 +1,7 @@
 .wrangler/
 .codeflicker/
 package-lock.json
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
