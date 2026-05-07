@@ -24,18 +24,8 @@ const CryptoJS = {
   }
 };
 
-const PASSWORD_HASH_ITERATIONS = 120000;
-
 function bytesToHex(bytes) {
   return Array.from(bytes).map(byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function hexToBytes(hex) {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
 }
 
 function randomHex(byteLength = 16) {
@@ -57,43 +47,26 @@ function constantTimeEqual(a = '', b = '') {
   return diff === 0;
 }
 
-async function pbkdf2Hex(password, saltHex, iterations = PASSWORD_HASH_ITERATIONS) {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(String(password)),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  );
-  const bits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      hash: 'SHA-256',
-      salt: hexToBytes(saltHex),
-      iterations
-    },
-    key,
-    256
-  );
-  return bytesToHex(new Uint8Array(bits));
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value)));
+  return bytesToHex(new Uint8Array(digest));
 }
 
 async function hashPassword(password) {
   const salt = randomHex(16);
-  const hash = await pbkdf2Hex(password, salt);
-  return `pbkdf2-sha256$${PASSWORD_HASH_ITERATIONS}$${salt}$${hash}`;
+  const hash = await sha256Hex(`${salt}:${password}`);
+  return `sha256$${salt}$${hash}`;
 }
 
 async function verifyPassword(password, encodedHash) {
   if (!encodedHash || typeof encodedHash !== 'string') return false;
-  const [algorithm, iterationsRaw, salt, expectedHash] = encodedHash.split('$');
-  const iterations = Number(iterationsRaw);
+  const [algorithm, salt, expectedHash] = encodedHash.split('$');
 
-  if (algorithm !== 'pbkdf2-sha256' || !Number.isInteger(iterations) || !salt || !expectedHash) {
+  if (algorithm !== 'sha256' || !salt || !expectedHash) {
     return false;
   }
 
-  const actualHash = await pbkdf2Hex(password, salt, iterations);
+  const actualHash = await sha256Hex(`${salt}:${password}`);
   return constantTimeEqual(actualHash, expectedHash);
 }
 

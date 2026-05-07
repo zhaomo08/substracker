@@ -23,7 +23,7 @@ test('login migrates legacy plaintext password to hash and sets secure cookie on
   assert.equal(response.status, 200);
   assert.match(response.headers.get('Set-Cookie'), /Secure/);
   assert.equal(stored.ADMIN_PASSWORD, '');
-  assert.match(stored.ADMIN_PASSWORD_HASH, /^pbkdf2-sha256\$/);
+  assert.match(stored.ADMIN_PASSWORD_HASH, /^sha256\$/);
 });
 
 test('login returns 429 after repeated failures', async () => {
