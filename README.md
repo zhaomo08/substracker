@@ -244,21 +244,9 @@ npm run deploy:safe
 
 ---
 
-## 欢迎关注我的公众号
 
-![39d8d5a902fa1eee6cbbbc8a0dcff4b](https://github.com/user-attachments/assets/96bae085-4299-4377-9958-9a3a11294efc)
 
----
 
-## 赞助
-
-本项目 CDN 加速及安全防护由 Tencent EdgeOne 赞助：EdgeOne 提供长期有效的免费套餐，包含不限量流量和请求，覆盖中国大陆节点，且无超额收费。
-
-[[Best Asian CDN, Edge, and Secure Solutions - Tencent EdgeOne](https://edgeone.ai/?from=github)]
-
-[![image](https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png)](https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png)
-
----
 
 ## 🤝 贡献
 
@@ -268,6 +256,3 @@ npm run deploy:safe
 
 MIT License
 
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=zhaomo08/substracker&type=Date)](https://www.star-history.com/#zhaomo08/substracker&Date)
